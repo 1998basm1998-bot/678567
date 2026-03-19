@@ -1,22 +1,19 @@
 // --- البيانات وحالة التطبيق ---
-// نستخدم localStorage لحفظ البيانات حتى لو أغلقنا الصفحة
 let currentInventory = 1;
+let currentRentInventory = 1; // للتحكم بمخزون نافذة البيع
 let currentCustomerId = null;
 
-// تهيئة البيانات إذا لم تكن موجودة
 let data = JSON.parse(localStorage.getItem('kareemData')) || {
     inventory1: [],
     inventory2: [],
     customers: [],
-    transactions: [] // كل المعاملات تخزن هنا
+    transactions: []
 };
 
-// دالة لحفظ البيانات في المتصفح
 function saveData() {
     localStorage.setItem('kareemData', JSON.stringify(data));
 }
 
-// دالة لتنسيق الرقم إلى دينار عراقي مع فواصل الآلاف
 function formatIQD(number) {
     return new Intl.NumberFormat('en-IQ').format(number);
 }
@@ -27,7 +24,7 @@ function checkPassword() {
     if (pass === "1001") {
         document.getElementById('login-screen').classList.remove('active');
         document.getElementById('main-app').classList.add('active');
-        renderInventory(); // تحميل البيانات الأولية
+        renderInventory();
     } else {
         alert("كلمة المرور خاطئة");
     }
@@ -35,15 +32,12 @@ function checkPassword() {
 
 // --- التنقل بين التبويبات السفلية ---
 function switchTab(tabId) {
-    // إخفاء كل التبويبات
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     
-    // إظهار التبويبة المطلوبة
     document.getElementById(tabId).classList.add('active');
     document.getElementById(tabId.replace('tab-', 'nav-')).classList.add('active');
 
-    // تحديث البيانات بناءً على التبويبة
     if(tabId === 'tab-inventory') renderInventory();
     if(tabId === 'tab-customers') {
         document.getElementById('customers-main-view').style.display = 'block';
@@ -53,7 +47,6 @@ function switchTab(tabId) {
     if(tabId === 'tab-alerts') renderAlerts();
 }
 
-// --- النوافذ المنبثقة (Modals) ---
 function openModal(modalId) {
     document.getElementById(modalId).classList.add('active');
 }
@@ -89,7 +82,6 @@ function saveItem() {
     saveData();
     closeModal('addItemModal');
     
-    // تفريغ الحقول
     document.getElementById('item-name').value = '';
     document.getElementById('item-price').value = '';
     document.getElementById('item-qty').value = '';
@@ -138,8 +130,8 @@ function saveCustomer() {
     const newCustomer = {
         id: Date.now(),
         name: name,
-        phone: "964" + phone, // دمج كود الدولة مع الرقم
-        balance: 0 // الرصيد المتبقي بذمته
+        phone: "964" + phone,
+        balance: 0
     };
 
     data.customers.push(newCustomer);
@@ -178,7 +170,6 @@ function deleteCustomer(id) {
     }
 }
 
-// --- تفاصيل الزبون ---
 function openCustomerDetails(id) {
     currentCustomerId = id;
     const customer = data.customers.find(c => c.id === id);
@@ -204,15 +195,13 @@ function updateCustomerBalanceDisplay(customer) {
 
 // ================= قسم التأجير والتسديد =================
 
-// تسديد مبلغ
 function savePayment() {
     const amount = parseFloat(document.getElementById('payment-amount').value);
     if(isNaN(amount) || amount <= 0) return;
 
     const customer = data.customers.find(c => c.id === currentCustomerId);
-    customer.balance -= amount; // تقليل الديون
+    customer.balance -= amount;
 
-    // تسجيل المعاملة كدفعة
     data.transactions.push({
         id: Date.now(),
         customerId: currentCustomerId,
@@ -228,42 +217,62 @@ function savePayment() {
     renderTransactions();
 }
 
-// فتح نافذة البيع (تجهيز الحقول)
+// تغيير المخزون داخل نافذة البيع
+function changeRentInventory(num) {
+    currentRentInventory = num;
+    document.getElementById('btn-rent-inv-1').classList.remove('active');
+    document.getElementById('btn-rent-inv-2').classList.remove('active');
+    document.getElementById(`btn-rent-inv-${num}`).classList.add('active');
+    
+    // تحديث جميع القوائم المنسدلة الحالية بالمواد الجديدة وإفراغ اختيارها
+    const selects = document.querySelectorAll('.rent-item-select');
+    selects.forEach(select => {
+        populateSelectOptions(select);
+    });
+    calculateRentTotal();
+}
+
+function populateSelectOptions(selectElement) {
+    const items = currentRentInventory === 1 ? data.inventory1 : data.inventory2;
+    let optionsHTML = '<option value="">اختر مادة...</option>';
+    items.forEach(item => {
+        optionsHTML += `<option value="${item.id}" data-price="${item.price}">${item.name} (${formatIQD(item.price)} د.ع)</option>`;
+    });
+    selectElement.innerHTML = optionsHTML;
+}
+
 function openRentModal() {
+    // تعيين المخزون الافتراضي لعملية البيع
+    changeRentInventory(1);
+    
     document.getElementById('rent-items-container').innerHTML = '';
     document.getElementById('rent-days').value = '';
     document.getElementById('rent-paid').value = '';
     document.getElementById('rent-daily-total').innerText = '0';
     document.getElementById('rent-grand-total').innerText = '0';
-    addRentItemRow(); // إضافة أول حقل اختيار
+    addRentItemRow(); 
     openModal('rentModal');
 }
 
-// إضافة سطر لاختيار مادة في نافذة البيع
 function addRentItemRow() {
     const container = document.getElementById('rent-items-container');
     const rowId = Date.now();
     
-    // جمع كل المواد من المخزنين لإنشاء القائمة المنسدلة
-    const allItems = [...data.inventory1, ...data.inventory2];
-    let optionsHTML = '<option value="">اختر مادة...</option>';
-    allItems.forEach(item => {
-        optionsHTML += `<option value="${item.id}" data-price="${item.price}">${item.name} (${formatIQD(item.price)} د.ع)</option>`;
-    });
-
     const rowHTML = `
         <div class="rent-item-row" id="row-${rowId}">
             <select class="rent-item-select" onchange="calculateRentTotal()">
-                ${optionsHTML}
             </select>
-            <input type="number" placeholder="الكمية" value="1" min="1" class="rent-item-qty" oninput="calculateRentTotal()" style="width: 80px; margin-bottom:0;">
+            <input type="number" placeholder="الكمية" value="1" min="1" class="rent-item-qty" oninput="calculateRentTotal()" style="width: 70px; margin-bottom:0;">
             <button class="btn-danger btn-small" onclick="document.getElementById('row-${rowId}').remove(); calculateRentTotal()">X</button>
         </div>
     `;
     container.insertAdjacentHTML('beforeend', rowHTML);
+    
+    // تعبئة القائمة بالمواد الخاصة بالمخزون المحدد حالياً
+    const newSelect = container.querySelector(`#row-${rowId} .rent-item-select`);
+    populateSelectOptions(newSelect);
 }
 
-// حساب المجموع الكلي أثناء إدخال البيانات
 function calculateRentTotal() {
     const selects = document.querySelectorAll('.rent-item-select');
     const qtys = document.querySelectorAll('.rent-item-qty');
@@ -283,10 +292,9 @@ function calculateRentTotal() {
     document.getElementById('rent-daily-total').innerText = formatIQD(dailyTotal);
     document.getElementById('rent-grand-total').innerText = formatIQD(grandTotal);
     
-    return grandTotal; // نرجعه لنستخدمه عند الحفظ
+    return grandTotal;
 }
 
-// حفظ معاملة التأجير
 function saveRentalTransaction() {
     const grandTotal = calculateRentTotal();
     const days = parseInt(document.getElementById('rent-days').value);
@@ -297,18 +305,14 @@ function saveRentalTransaction() {
     }
 
     const customer = data.customers.find(c => c.id === currentCustomerId);
-    
-    // المتبقي من هذه المعاملة يضاف لرصيد الزبون
     const remaining = grandTotal - paid;
     customer.balance += remaining;
 
-    // جمع أسماء المواد المؤجرة للوصف
     let itemsText = [];
     document.querySelectorAll('.rent-item-select').forEach(select => {
-        if(select.value) itemsText.push(select.options[select.selectedIndex].text.split('(')[0]); // نأخذ الاسم فقط
+        if(select.value) itemsText.push(select.options[select.selectedIndex].text.split('(')[0]);
     });
 
-    // حساب تاريخ الإرجاع المتوقع
     const returnDate = new Date();
     returnDate.setDate(returnDate.getDate() + days);
 
@@ -322,8 +326,8 @@ function saveRentalTransaction() {
         paid: paid,
         remaining: remaining,
         date: new Date().toLocaleDateString('ar-IQ'),
-        returnDateTimestamp: returnDate.getTime(), // نستخدمه للتنبيهات
-        status: 'ongoing' // جارية
+        returnDateTimestamp: returnDate.getTime(),
+        status: 'ongoing'
     };
 
     data.transactions.push(transaction);
@@ -333,26 +337,25 @@ function saveRentalTransaction() {
     renderTransactions();
 }
 
-// عرض معاملات الزبون الحالي
 function renderTransactions() {
     const list = document.getElementById('transactions-list');
     list.innerHTML = '';
     
-    const custTrans = data.transactions.filter(t => t.customerId === currentCustomerId).reverse(); // الأحدث أولاً
+    const custTrans = data.transactions.filter(t => t.customerId === currentCustomerId).reverse();
 
     custTrans.forEach(t => {
         if(t.type === 'payment') {
             list.innerHTML += `
-                <div class="card" style="border-right: 4px solid #27ae60;">
+                <div class="card" style="border-right: 5px solid #27ae60;">
                     <div class="card-info">
-                        <h4>تسديد نقد</h4>
+                        <h4 style="color:#27ae60;">تسديد نقد</h4>
                         <p>المبلغ: ${formatIQD(t.amount)} د.ع | التاريخ: ${t.date}</p>
                     </div>
                 </div>
             `;
         } else {
             list.innerHTML += `
-                <div class="card" style="border-right: 4px solid #2980b9;">
+                <div class="card" style="border-right: 5px solid #2980b9;">
                     <div class="card-info">
                         <h4>تأجير: ${t.items}</h4>
                         <p>المدة: ${t.days} أيام | الكلي: ${formatIQD(t.total)}</p>
@@ -361,7 +364,7 @@ function renderTransactions() {
                     </div>
                     <div class="card-actions">
                         <button class="btn-success btn-small" onclick="shareWhatsApp(${t.id})">مشاركة واتساب</button>
-                        ${t.status === 'ongoing' ? `<button class="btn-primary btn-small" onclick="completeTransaction(${t.id})">إنهاء</button>` : `<span style="color: green; font-size:12px;">مكتملة</span>`}
+                        ${t.status === 'ongoing' ? `<button class="btn-primary btn-small" onclick="completeTransaction(${t.id})">إنهاء</button>` : `<span style="color: #27ae60; font-size:14px; font-weight:bold; text-align:center;">مكتملة ✔</span>`}
                     </div>
                 </div>
             `;
@@ -369,7 +372,6 @@ function renderTransactions() {
     });
 }
 
-// إنهاء المعاملة (إرجاع المواد)
 function completeTransaction(transId) {
     if(confirm("هل تم إرجاع المواد؟")) {
         const trans = data.transactions.find(t => t.id === transId);
@@ -379,7 +381,6 @@ function completeTransaction(transId) {
     }
 }
 
-// مشاركة الفاتورة عبر واتساب
 function shareWhatsApp(transId) {
     const trans = data.transactions.find(t => t.id === transId);
     const customer = data.customers.find(c => c.id === trans.customerId);
@@ -402,17 +403,15 @@ function renderAlerts() {
     let hasAlerts = false;
 
     data.transactions.forEach(t => {
-        // إذا كانت المعاملة جارية وتاريخ الإرجاع أقدم من الوقت الحالي
         if(t.type === 'rent' && t.status === 'ongoing' && t.returnDateTimestamp < now) {
             hasAlerts = true;
             const customer = data.customers.find(c => c.id === t.customerId);
             
-            // حساب أيام التأخير
             const diffTime = Math.abs(now - t.returnDateTimestamp);
             const delayDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             list.innerHTML += `
-                <div class="card" style="border-right: 4px solid #e74c3c; background-color: #fdf0ed;">
+                <div class="card" style="border-right: 5px solid #e74c3c; background-color: #fdf0ed;">
                     <div class="card-info">
                         <h4 style="color:#c0392b;">تأخير: ${customer.name}</h4>
                         <p>المواد: ${t.items}</p>
@@ -428,6 +427,6 @@ function renderAlerts() {
     });
 
     if(!hasAlerts) {
-        list.innerHTML = '<p style="text-align:center; color:#7f8c8d; margin-top:20px;">لا توجد تنبيهات حالياً.</p>';
+        list.innerHTML = '<p style="text-align:center; color:#7f8c8d; margin-top:20px; font-weight:bold;">لا توجد تنبيهات حالياً.</p>';
     }
 }
