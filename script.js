@@ -38,7 +38,10 @@ function switchTab(tabId) {
     document.getElementById(tabId).classList.add('active');
     document.getElementById(tabId.replace('tab-', 'nav-')).classList.add('active');
 
-    if(tabId === 'tab-inventory') renderInventory();
+    if(tabId === 'tab-inventory') {
+        document.getElementById('search-inventory').value = '';
+        renderInventory();
+    }
     if(tabId === 'tab-customers') {
         document.getElementById('customers-main-view').style.display = 'block';
         document.getElementById('customer-details-view').style.display = 'none';
@@ -62,6 +65,7 @@ function switchInventory(num) {
     document.getElementById('btn-inv-2').classList.remove('active');
     document.getElementById(`btn-inv-${num}`).classList.add('active');
     document.getElementById('current-inv-label').innerText = num;
+    document.getElementById('search-inventory').value = ''; // تصفير حقل البحث عند التبديل
     renderInventory();
 }
 
@@ -86,7 +90,58 @@ function saveItem() {
     document.getElementById('item-price').value = '';
     document.getElementById('item-qty').value = '';
     
-    renderInventory();
+    // استعادة عرض القائمة مع مراعاة البحث الحالي إن وجد
+    searchInventory();
+}
+
+// دالة البحث الجديدة من أول الاسم
+function searchInventory() {
+    const query = document.getElementById('search-inventory').value.toLowerCase().trim();
+    renderInventory(query);
+}
+
+// دالة فتح نافذة التعديل
+function openEditModal(id, invNum) {
+    const items = invNum === 1 ? data.inventory1 : data.inventory2;
+    const item = items.find(i => i.id === id);
+
+    if (item) {
+        document.getElementById('edit-item-id').value = id;
+        document.getElementById('edit-item-inv').value = invNum;
+        document.getElementById('edit-item-name').value = item.name;
+        document.getElementById('edit-item-price').value = item.price;
+        document.getElementById('edit-item-qty').value = item.qty;
+        
+        openModal('editItemModal');
+    }
+}
+
+// دالة حفظ التعديلات
+function saveEditItem() {
+    const id = parseInt(document.getElementById('edit-item-id').value);
+    const invNum = parseInt(document.getElementById('edit-item-inv').value);
+    const name = document.getElementById('edit-item-name').value;
+    const price = parseFloat(document.getElementById('edit-item-price').value);
+    const qty = parseInt(document.getElementById('edit-item-qty').value);
+
+    if (!name || isNaN(price) || isNaN(qty)) {
+        alert("يرجى تعبئة جميع الحقول بشكل صحيح"); return;
+    }
+
+    const items = invNum === 1 ? data.inventory1 : data.inventory2;
+    const itemIndex = items.findIndex(i => i.id === id);
+
+    if (itemIndex > -1) {
+        items[itemIndex].name = name;
+        items[itemIndex].price = price;
+        items[itemIndex].qty = qty;
+        
+        saveData();
+        closeModal('editItemModal');
+        
+        // تحديث العرض مع بقاء فلتر البحث إن وجد
+        searchInventory();
+    }
 }
 
 function deleteItem(id, invNum) {
@@ -94,14 +149,24 @@ function deleteItem(id, invNum) {
         if(invNum === 1) data.inventory1 = data.inventory1.filter(item => item.id !== id);
         else data.inventory2 = data.inventory2.filter(item => item.id !== id);
         saveData();
-        renderInventory();
+        searchInventory();
     }
 }
 
-function renderInventory() {
+function renderInventory(searchQuery = '') {
     const list = document.getElementById('inventory-list');
     list.innerHTML = '';
-    const items = currentInventory === 1 ? data.inventory1 : data.inventory2;
+    let items = currentInventory === 1 ? data.inventory1 : data.inventory2;
+
+    if (searchQuery) {
+        // فلترة بناءً على تطابق بداية الاسم (من أول اسم)
+        items = items.filter(item => item.name.toLowerCase().startsWith(searchQuery));
+    }
+
+    if(items.length === 0 && searchQuery !== '') {
+        list.innerHTML = '<p style="text-align:center; color:#7f8c8d; padding: 20px;">لا توجد مواد تطابق بحثك.</p>';
+        return;
+    }
 
     items.forEach(item => {
         list.innerHTML += `
@@ -112,6 +177,7 @@ function renderInventory() {
                     <p>الكمية المتوفرة: ${item.qty}</p>
                 </div>
                 <div class="card-actions">
+                    <button class="btn-warning btn-small" onclick="openEditModal(${item.id}, ${currentInventory})">تعديل</button>
                     <button class="btn-danger btn-small" onclick="deleteItem(${item.id}, ${currentInventory})">حذف</button>
                 </div>
             </div>
