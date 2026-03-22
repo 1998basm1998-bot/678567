@@ -8,7 +8,6 @@
 </head>
 <body>
 
-    <!-- واجهة تسجيل الدخول -->
     <div id="login-screen" class="screen active">
         <div class="login-box">
             <h2>محلات كريم لتأجير العدد اليدوية</h2>
@@ -17,41 +16,37 @@
         </div>
     </div>
 
-    <!-- واجهة التطبيق الرئيسية -->
     <div id="main-app" class="screen">
         <header>
             <h1>نظام تأجير كريم</h1>
         </header>
 
-        <!-- المحتوى الرئيسي -->
         <main id="app-content">
             
-            <!-- تبويبة المخزون -->
             <section id="tab-inventory" class="tab-content active">
                 <div class="top-actions">
                     <button onclick="openModal('addItemModal')" class="btn-primary">إضافة مادة +</button>
                 </div>
+                
+                <input type="text" id="search-inventory" placeholder="بحث عن مادة (اكتب بداية اسم المادة)..." onkeyup="searchInventory()">
+
                 <div class="inventory-selectors">
                     <button onclick="switchInventory(1)" id="btn-inv-1" class="active">المخزون 1</button>
                     <button onclick="switchInventory(2)" id="btn-inv-2">المخزون 2</button>
                 </div>
                 <div id="inventory-list" class="list-container">
-                    <!-- سيتم إضافة المواد هنا عبر الجافاسكريبت -->
-                </div>
+                    </div>
             </section>
 
-            <!-- تبويبة الزبائن -->
             <section id="tab-customers" class="tab-content">
                 <div id="customers-main-view">
                     <div class="top-actions">
                         <button onclick="openModal('addCustomerModal')" class="btn-primary">إضافة زبون جديد +</button>
                     </div>
                     <div id="customers-list" class="list-container">
-                        <!-- سيتم إضافة الزبائن هنا -->
-                    </div>
+                        </div>
                 </div>
 
-                <!-- واجهة تفاصيل الزبون -->
                 <div id="customer-details-view" style="display: none;">
                     <button onclick="backToCustomers()" class="btn-secondary">رجوع</button>
                     <h2 id="detail-customer-name" style="margin-top: 10px;">اسم الزبون</h2>
@@ -65,22 +60,18 @@
                     </div>
                     <h3 style="margin: 15px 0;">المعاملات</h3>
                     <div id="transactions-list" class="list-container">
-                        <!-- المعاملات تظهر هنا -->
-                    </div>
+                        </div>
                 </div>
             </section>
 
-            <!-- تبويبة التنبيهات -->
             <section id="tab-alerts" class="tab-content">
                 <h2 style="margin-bottom: 15px;">التنبيهات (متجاوزي المدة)</h2>
                 <div id="alerts-list" class="list-container">
-                    <!-- التنبيهات تظهر هنا -->
-                </div>
+                    </div>
             </section>
 
         </main>
 
-        <!-- التبويبات السفلية -->
         <nav class="bottom-nav">
             <button onclick="switchTab('tab-inventory')" class="nav-btn active" id="nav-inventory">المخزون</button>
             <button onclick="switchTab('tab-customers')" class="nav-btn" id="nav-customers">الزبائن</button>
@@ -88,9 +79,6 @@
         </nav>
     </div>
 
-    <!-- ================= النوافذ المنبثقة (Modals) ================= -->
-
-    <!-- نافذة إضافة مادة -->
     <div id="addItemModal" class="modal">
         <div class="modal-content">
             <h3>إضافة مادة للمخزون <span id="current-inv-label">1</span></h3>
@@ -104,7 +92,21 @@
         </div>
     </div>
 
-    <!-- نافذة إضافة زبون -->
+    <div id="editItemModal" class="modal">
+        <div class="modal-content">
+            <h3>تعديل المادة</h3>
+            <input type="hidden" id="edit-item-id">
+            <input type="hidden" id="edit-item-inv">
+            <input type="text" id="edit-item-name" placeholder="اسم المادة">
+            <input type="number" id="edit-item-price" placeholder="سعر المادة (يومياً)">
+            <input type="number" id="edit-item-qty" placeholder="الكمية">
+            <div class="modal-actions">
+                <button onclick="saveEditItem()" class="btn-primary">حفظ التعديلات</button>
+                <button onclick="closeModal('editItemModal')" class="btn-secondary">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
     <div id="addCustomerModal" class="modal">
         <div class="modal-content">
             <h3>إضافة زبون جديد</h3>
@@ -120,20 +122,17 @@
         </div>
     </div>
 
-    <!-- نافذة البيع (التأجير) -->
     <div id="rentModal" class="modal">
         <div class="modal-content modal-large">
             <h3>تأجير جديد</h3>
             
-            <!-- الإضافة: اختيار المخزون داخل نافذة البيع -->
             <div class="inventory-selectors" style="margin-bottom: 15px; margin-top: 10px;">
                 <button onclick="changeRentInventory(1)" id="btn-rent-inv-1" class="active">المخزون 1</button>
                 <button onclick="changeRentInventory(2)" id="btn-rent-inv-2">المخزون 2</button>
             </div>
 
             <div id="rent-items-container">
-                <!-- حقول اختيار المواد تضاف هنا ديناميكياً بناءً على المخزون -->
-            </div>
+                </div>
             <button onclick="addRentItemRow()" class="btn-secondary" style="margin-bottom: 15px; width: 100%;">+ إضافة مادة أخرى</button>
             
             <input type="number" id="rent-days" placeholder="عدد أيام التأجير" oninput="calculateRentTotal()">
@@ -152,7 +151,6 @@
         </div>
     </div>
 
-    <!-- نافذة التسديد -->
     <div id="paymentModal" class="modal">
         <div class="modal-content">
             <h3>تسديد مبلغ</h3>
