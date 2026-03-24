@@ -1,6 +1,6 @@
 // --- البيانات وحالة التطبيق ---
 let currentInventory = 1;
-let currentRentInventory = 1; // للتحكم بمخزون نافذة البيع
+let currentRentInventory = 1; 
 let currentCustomerId = null;
 
 let data = JSON.parse(localStorage.getItem('kareemData')) || {
@@ -43,6 +43,7 @@ function switchTab(tabId) {
         renderInventory();
     }
     if(tabId === 'tab-customers') {
+        document.getElementById('search-customer').value = '';
         document.getElementById('customers-main-view').style.display = 'block';
         document.getElementById('customer-details-view').style.display = 'none';
         renderCustomers();
@@ -65,7 +66,7 @@ function switchInventory(num) {
     document.getElementById('btn-inv-2').classList.remove('active');
     document.getElementById(`btn-inv-${num}`).classList.add('active');
     document.getElementById('current-inv-label').innerText = num;
-    document.getElementById('search-inventory').value = ''; // تصفير حقل البحث عند التبديل
+    document.getElementById('search-inventory').value = ''; 
     renderInventory();
 }
 
@@ -90,17 +91,14 @@ function saveItem() {
     document.getElementById('item-price').value = '';
     document.getElementById('item-qty').value = '';
     
-    // استعادة عرض القائمة مع مراعاة البحث الحالي إن وجد
     searchInventory();
 }
 
-// دالة البحث الجديدة من أول الاسم
 function searchInventory() {
     const query = document.getElementById('search-inventory').value.toLowerCase().trim();
     renderInventory(query);
 }
 
-// دالة فتح نافذة التعديل
 function openEditModal(id, invNum) {
     const items = invNum === 1 ? data.inventory1 : data.inventory2;
     const item = items.find(i => i.id === id);
@@ -116,7 +114,6 @@ function openEditModal(id, invNum) {
     }
 }
 
-// دالة حفظ التعديلات
 function saveEditItem() {
     const id = parseInt(document.getElementById('edit-item-id').value);
     const invNum = parseInt(document.getElementById('edit-item-inv').value);
@@ -138,8 +135,6 @@ function saveEditItem() {
         
         saveData();
         closeModal('editItemModal');
-        
-        // تحديث العرض مع بقاء فلتر البحث إن وجد
         searchInventory();
     }
 }
@@ -159,7 +154,6 @@ function renderInventory(searchQuery = '') {
     let items = currentInventory === 1 ? data.inventory1 : data.inventory2;
 
     if (searchQuery) {
-        // فلترة بناءً على تطابق بداية الاسم (من أول اسم)
         items = items.filter(item => item.name.toLowerCase().startsWith(searchQuery));
     }
 
@@ -187,6 +181,11 @@ function renderInventory(searchQuery = '') {
 
 // ================= قسم الزبائن =================
 
+function searchCustomer() {
+    const query = document.getElementById('search-customer').value.toLowerCase().trim();
+    renderCustomers(query);
+}
+
 function saveCustomer() {
     const name = document.getElementById('cust-name').value;
     const phone = document.getElementById('cust-phone').value;
@@ -207,13 +206,49 @@ function saveCustomer() {
     document.getElementById('cust-name').value = '';
     document.getElementById('cust-phone').value = '';
     
-    renderCustomers();
+    searchCustomer();
 }
 
-function renderCustomers() {
+function openEditCustomerModal(id) {
+    const customer = data.customers.find(c => c.id === id);
+    if (customer) {
+        document.getElementById('edit-cust-id').value = customer.id;
+        document.getElementById('edit-cust-name').value = customer.name;
+        document.getElementById('edit-cust-phone').value = customer.phone.replace(/^964/, ''); // إزالة الكود للعرض
+        
+        openModal('editCustomerModal');
+    }
+}
+
+function saveEditCustomer() {
+    const id = parseInt(document.getElementById('edit-cust-id').value);
+    const name = document.getElementById('edit-cust-name').value;
+    const phone = document.getElementById('edit-cust-phone').value;
+
+    if (!name || !phone) { alert("يرجى إدخال الاسم والرقم"); return; }
+
+    const customerIndex = data.customers.findIndex(c => c.id === id);
+    if (customerIndex > -1) {
+        data.customers[customerIndex].name = name;
+        data.customers[customerIndex].phone = "964" + phone;
+        
+        saveData();
+        closeModal('editCustomerModal');
+        searchCustomer();
+    }
+}
+
+function renderCustomers(searchQuery = '') {
     const list = document.getElementById('customers-list');
     list.innerHTML = '';
-    data.customers.forEach(cust => {
+    
+    let filteredCustomers = data.customers;
+    if(searchQuery) {
+        // فلترة من أول حرف للاسم
+        filteredCustomers = filteredCustomers.filter(cust => cust.name.toLowerCase().startsWith(searchQuery));
+    }
+
+    filteredCustomers.forEach(cust => {
         list.innerHTML += `
             <div class="card" onclick="openCustomerDetails(${cust.id})">
                 <div class="card-info">
@@ -221,6 +256,7 @@ function renderCustomers() {
                     <p>الرقم: +${cust.phone}</p>
                 </div>
                 <div class="card-actions">
+                    <button class="btn-warning btn-small" onclick="event.stopPropagation(); openEditCustomerModal(${cust.id})">تعديل</button>
                     <button class="btn-danger btn-small" onclick="event.stopPropagation(); deleteCustomer(${cust.id})">حذف</button>
                 </div>
             </div>
@@ -232,7 +268,7 @@ function deleteCustomer(id) {
     if(confirm("هل أنت متأكد من حذف هذا الزبون؟")) {
         data.customers = data.customers.filter(c => c.id !== id);
         saveData();
-        renderCustomers();
+        searchCustomer();
     }
 }
 
@@ -252,14 +288,14 @@ function backToCustomers() {
     document.getElementById('customers-main-view').style.display = 'block';
     document.getElementById('customer-details-view').style.display = 'none';
     currentCustomerId = null;
-    renderCustomers();
+    searchCustomer();
 }
 
 function updateCustomerBalanceDisplay(customer) {
     document.getElementById('detail-customer-balance').innerText = `${formatIQD(customer.balance)} د.ع`;
 }
 
-// ================= قسم التأجير والتسديد =================
+// ================= قسم التأجير والتسديد والمعاملات =================
 
 function savePayment() {
     const amount = parseFloat(document.getElementById('payment-amount').value);
@@ -268,12 +304,14 @@ function savePayment() {
     const customer = data.customers.find(c => c.id === currentCustomerId);
     customer.balance -= amount;
 
+    const now = new Date();
     data.transactions.push({
         id: Date.now(),
         customerId: currentCustomerId,
         type: 'payment',
         amount: amount,
-        date: new Date().toLocaleDateString('ar-IQ')
+        date: now.toLocaleDateString('ar-IQ'),
+        time: now.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit', hour12: true })
     });
 
     saveData();
@@ -283,14 +321,12 @@ function savePayment() {
     renderTransactions();
 }
 
-// تغيير المخزون داخل نافذة البيع
 function changeRentInventory(num) {
     currentRentInventory = num;
     document.getElementById('btn-rent-inv-1').classList.remove('active');
     document.getElementById('btn-rent-inv-2').classList.remove('active');
     document.getElementById(`btn-rent-inv-${num}`).classList.add('active');
     
-    // تحديث جميع القوائم المنسدلة الحالية بالمواد الجديدة وإفراغ اختيارها
     const selects = document.querySelectorAll('.rent-item-select');
     selects.forEach(select => {
         populateSelectOptions(select);
@@ -308,9 +344,7 @@ function populateSelectOptions(selectElement) {
 }
 
 function openRentModal() {
-    // تعيين المخزون الافتراضي لعملية البيع
     changeRentInventory(1);
-    
     document.getElementById('rent-items-container').innerHTML = '';
     document.getElementById('rent-days').value = '';
     document.getElementById('rent-paid').value = '';
@@ -333,8 +367,6 @@ function addRentItemRow() {
         </div>
     `;
     container.insertAdjacentHTML('beforeend', rowHTML);
-    
-    // تعبئة القائمة بالمواد الخاصة بالمخزون المحدد حالياً
     const newSelect = container.querySelector(`#row-${rowId} .rent-item-select`);
     populateSelectOptions(newSelect);
 }
@@ -375,12 +407,21 @@ function saveRentalTransaction() {
     customer.balance += remaining;
 
     let itemsText = [];
-    document.querySelectorAll('.rent-item-select').forEach(select => {
-        if(select.value) itemsText.push(select.options[select.selectedIndex].text.split('(')[0]);
+    const qtys = document.querySelectorAll('.rent-item-qty');
+    
+    document.querySelectorAll('.rent-item-select').forEach((select, index) => {
+        if(select.value) {
+            // إظهار العدد الخاص بكل مادة
+            const itemName = select.options[select.selectedIndex].text.split('(')[0].trim();
+            const qty = qtys[index].value || 1;
+            itemsText.push(`${itemName} (عدد ${qty})`);
+        }
     });
 
     const returnDate = new Date();
     returnDate.setDate(returnDate.getDate() + days);
+    
+    const now = new Date();
 
     const transaction = {
         id: Date.now(),
@@ -391,7 +432,8 @@ function saveRentalTransaction() {
         total: grandTotal,
         paid: paid,
         remaining: remaining,
-        date: new Date().toLocaleDateString('ar-IQ'),
+        date: now.toLocaleDateString('ar-IQ'),
+        time: now.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit', hour12: true }),
         returnDateTimestamp: returnDate.getTime(),
         status: 'ongoing'
     };
@@ -403,6 +445,97 @@ function saveRentalTransaction() {
     renderTransactions();
 }
 
+function deleteTransaction(id) {
+    if(confirm("هل أنت متأكد من حذف هذه المعاملة؟ سيتم التراجع عن تأثيرها في حساب الزبون.")) {
+        const trans = data.transactions.find(t => t.id === id);
+        const customer = data.customers.find(c => c.id === trans.customerId);
+        
+        if (trans.type === 'rent') {
+            customer.balance -= trans.remaining; // خصم الدين الذي تم إضافته
+        } else if (trans.type === 'payment') {
+            customer.balance += trans.amount; // إضافة المبلغ الذي تم تنزيله
+        }
+        
+        data.transactions = data.transactions.filter(t => t.id !== id);
+        saveData();
+        updateCustomerBalanceDisplay(customer);
+        renderTransactions();
+    }
+}
+
+function openEditTransactionModal(id) {
+    const trans = data.transactions.find(t => t.id === id);
+    if(trans && trans.type === 'rent') {
+        document.getElementById('edit-trans-id').value = id;
+        document.getElementById('edit-trans-days').value = trans.days;
+        document.getElementById('edit-trans-total').value = trans.total;
+        document.getElementById('edit-trans-paid').value = trans.paid;
+        openModal('editTransactionModal');
+    }
+}
+
+function saveEditTransaction() {
+    const id = parseInt(document.getElementById('edit-trans-id').value);
+    const trans = data.transactions.find(t => t.id === id);
+    const customer = data.customers.find(c => c.id === trans.customerId);
+    
+    const newDays = parseInt(document.getElementById('edit-trans-days').value) || trans.days;
+    const newTotal = parseFloat(document.getElementById('edit-trans-total').value) || 0;
+    const newPaid = parseFloat(document.getElementById('edit-trans-paid').value) || 0;
+    
+    // التراجع عن التأثير القديم
+    customer.balance -= trans.remaining;
+    
+    // التحديث
+    trans.days = newDays;
+    trans.total = newTotal;
+    trans.paid = newPaid;
+    trans.remaining = trans.total - trans.paid;
+    
+    // تطبيق التأثير الجديد
+    customer.balance += trans.remaining;
+    
+    saveData();
+    closeModal('editTransactionModal');
+    updateCustomerBalanceDisplay(customer);
+    renderTransactions();
+}
+
+function openReturnModal(id) {
+    document.getElementById('return-trans-id').value = id;
+    document.getElementById('return-items-note').value = '';
+    document.getElementById('return-paid-now').value = '';
+    document.getElementById('return-status').value = 'completed'; 
+    openModal('returnModal');
+}
+
+function saveReturn() {
+    const id = parseInt(document.getElementById('return-trans-id').value);
+    const trans = data.transactions.find(t => t.id === id);
+    const customer = data.customers.find(c => c.id === trans.customerId);
+    
+    const note = document.getElementById('return-items-note').value;
+    const paidNow = parseFloat(document.getElementById('return-paid-now').value) || 0;
+    const status = document.getElementById('return-status').value;
+    
+    if (paidNow > 0) {
+        trans.paid += paidNow;
+        trans.remaining = trans.total - trans.paid;
+        customer.balance -= paidNow; // الدفع الآن يقلل من دين الزبون
+    }
+    
+    if (note.trim() !== "") {
+        trans.items += `<br><span style="color:#e67e22;">إرجاع: ${note}</span>`;
+    }
+    
+    trans.status = status;
+    
+    saveData();
+    closeModal('returnModal');
+    updateCustomerBalanceDisplay(customer);
+    renderTransactions();
+}
+
 function renderTransactions() {
     const list = document.getElementById('transactions-list');
     list.innerHTML = '';
@@ -410,12 +543,17 @@ function renderTransactions() {
     const custTrans = data.transactions.filter(t => t.customerId === currentCustomerId).reverse();
 
     custTrans.forEach(t => {
+        const displayTime = t.time ? t.time : ''; // إذا لم يكن موجوداً قديماً
+        
         if(t.type === 'payment') {
             list.innerHTML += `
                 <div class="card" style="border-right: 5px solid #27ae60;">
                     <div class="card-info">
                         <h4 style="color:#27ae60;">تسديد نقد</h4>
-                        <p>المبلغ: ${formatIQD(t.amount)} د.ع | التاريخ: ${t.date}</p>
+                        <p>المبلغ: ${formatIQD(t.amount)} د.ع | التاريخ: ${t.date} ${displayTime}</p>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn-danger btn-small" onclick="deleteTransaction(${t.id})">حذف</button>
                     </div>
                 </div>
             `;
@@ -426,11 +564,13 @@ function renderTransactions() {
                         <h4>تأجير: ${t.items}</h4>
                         <p>المدة: ${t.days} أيام | الكلي: ${formatIQD(t.total)}</p>
                         <p>المدفوع: ${formatIQD(t.paid)} | الباقي: ${formatIQD(t.remaining)}</p>
-                        <p>تاريخ: ${t.date}</p>
+                        <p>تاريخ: ${t.date} | الوقت: ${displayTime}</p>
                     </div>
                     <div class="card-actions">
-                        <button class="btn-success btn-small" onclick="shareWhatsApp(${t.id})">مشاركة واتساب</button>
-                        ${t.status === 'ongoing' ? `<button class="btn-primary btn-small" onclick="completeTransaction(${t.id})">إنهاء</button>` : `<span style="color: #27ae60; font-size:14px; font-weight:bold; text-align:center;">مكتملة ✔</span>`}
+                        <button class="btn-success btn-small" onclick="shareWhatsApp(${t.id})" style="margin-bottom:3px;">واتساب</button>
+                        ${t.status === 'ongoing' ? `<button class="btn-primary btn-small" onclick="openReturnModal(${t.id})" style="margin-bottom:3px; background:linear-gradient(to bottom, #e67e22, #d35400);">الراجع</button>` : `<span style="color: #27ae60; font-size:14px; font-weight:bold; text-align:center; margin-bottom:5px;">مكتملة ✔</span>`}
+                        <button class="btn-warning btn-small" onclick="openEditTransactionModal(${t.id})" style="margin-bottom:3px;">تعديل</button>
+                        <button class="btn-danger btn-small" onclick="deleteTransaction(${t.id})">حذف</button>
                     </div>
                 </div>
             `;
@@ -438,20 +578,14 @@ function renderTransactions() {
     });
 }
 
-function completeTransaction(transId) {
-    if(confirm("هل تم إرجاع المواد؟")) {
-        const trans = data.transactions.find(t => t.id === transId);
-        trans.status = 'completed';
-        saveData();
-        renderTransactions();
-    }
-}
-
 function shareWhatsApp(transId) {
     const trans = data.transactions.find(t => t.id === transId);
     const customer = data.customers.find(c => c.id === trans.customerId);
     
-    const message = `*محلات كريم لتأجير العدد اليدوية*\n\nمرحباً ${customer.name}،\nتفاصيل التأجير:\nالمواد: ${trans.items}\nالمدة: ${trans.days} أيام\nالمبلغ الكلي: ${formatIQD(trans.total)} د.ع\nالمدفوع: ${formatIQD(trans.paid)} د.ع\nالمتبقي من هذه الفاتورة: ${formatIQD(trans.remaining)} د.ع\n\nإجمالي الباقي بذمتكم: ${formatIQD(customer.balance)} د.ع\n\nشكراً لتعاملكم معنا!`;
+    // إزالة الـ HTML tags لو وجدت من الملاحظات
+    const cleanItems = trans.items.replace(/<[^>]*>?/gm, ' ');
+
+    const message = `*محلات كريم لتأجير العدد اليدوية*\n\nمرحباً ${customer.name}،\nتفاصيل التأجير:\nالمواد: ${cleanItems}\nالمدة: ${trans.days} أيام\nالمبلغ الكلي: ${formatIQD(trans.total)} د.ع\nالمدفوع: ${formatIQD(trans.paid)} د.ع\nالمتبقي من هذه الفاتورة: ${formatIQD(trans.remaining)} د.ع\n\nإجمالي الباقي بذمتكم: ${formatIQD(customer.balance)} د.ع\n\nشكراً لتعاملكم معنا!`;
     
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/${customer.phone}?text=${encodedMessage}`;
@@ -480,7 +614,7 @@ function renderAlerts() {
                 <div class="card" style="border-right: 5px solid #e74c3c; background-color: #fdf0ed;">
                     <div class="card-info">
                         <h4 style="color:#c0392b;">تأخير: ${customer.name}</h4>
-                        <p>المواد: ${t.items}</p>
+                        <p>المواد: ${t.items.replace(/<[^>]*>?/gm, ' ')}</p>
                         <p>مدة التأخير: ${delayDays} يوم</p>
                         <p>الرقم: +${customer.phone}</p>
                     </div>
