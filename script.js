@@ -327,20 +327,15 @@ function changeRentInventory(num) {
     document.getElementById('btn-rent-inv-2').classList.remove('active');
     document.getElementById(`btn-rent-inv-${num}`).classList.add('active');
     
-    const selects = document.querySelectorAll('.rent-item-select');
-    selects.forEach(select => {
-        populateSelectOptions(select);
+    const searches = document.querySelectorAll('.rent-item-search');
+    searches.forEach(search => {
+        search.value = '';
+    });
+    const prices = document.querySelectorAll('.rent-item-price');
+    prices.forEach(price => {
+        price.value = '0';
     });
     calculateRentTotal();
-}
-
-function populateSelectOptions(selectElement) {
-    const items = currentRentInventory === 1 ? data.inventory1 : data.inventory2;
-    let optionsHTML = '<option value="">اختر مادة...</option>';
-    items.forEach(item => {
-        optionsHTML += `<option value="${item.id}" data-price="${item.price}">${item.name} (${formatIQD(item.price)} د.ع)</option>`;
-    });
-    selectElement.innerHTML = optionsHTML;
 }
 
 function openRentModal() {
@@ -354,34 +349,74 @@ function openRentModal() {
     openModal('rentModal');
 }
 
+function filterRentItems(input, rowId) {
+    const query = input.value.toLowerCase().trim();
+    const dropdown = document.getElementById(`dropdown-${rowId}`);
+    const items = currentRentInventory === 1 ? data.inventory1 : data.inventory2;
+    
+    dropdown.innerHTML = '';
+    
+    let filtered = items;
+    if (query) {
+        filtered = items.filter(item => item.name.toLowerCase().startsWith(query));
+    }
+
+    if (filtered.length === 0) {
+        dropdown.style.display = 'none';
+        return;
+    }
+
+    filtered.forEach(item => {
+        const div = document.createElement('div');
+        div.style.padding = '10px';
+        div.style.borderBottom = '1px solid #eee';
+        div.style.cursor = 'pointer';
+        div.innerText = `${item.name} (${formatIQD(item.price)} د.ع)`;
+        div.onclick = function() {
+            input.value = item.name;
+            document.getElementById(`price-${rowId}`).value = item.price;
+            dropdown.style.display = 'none';
+            calculateRentTotal();
+        };
+        dropdown.appendChild(div);
+    });
+    
+    dropdown.style.display = 'block';
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.classList.contains('rent-item-search')) {
+        document.querySelectorAll('.rent-item-dropdown').forEach(d => d.style.display = 'none');
+    }
+});
+
 function addRentItemRow() {
     const container = document.getElementById('rent-items-container');
     const rowId = Date.now();
     
     const rowHTML = `
         <div class="rent-item-row" id="row-${rowId}">
-            <select class="rent-item-select" onchange="calculateRentTotal()">
-            </select>
+            <div style="position: relative; flex: 1;">
+                <input type="text" id="search-${rowId}" class="rent-item-search" placeholder="ابحث عن مادة..." onkeyup="filterRentItems(this, ${rowId})" onfocus="filterRentItems(this, ${rowId})" autocomplete="off" style="margin-bottom:0;">
+                <input type="hidden" id="price-${rowId}" class="rent-item-price" value="0">
+                <div id="dropdown-${rowId}" class="rent-item-dropdown" style="display:none; position:absolute; background:white; width:100%; border:1px solid #bdc3c7; border-radius:4px; max-height:150px; overflow-y:auto; z-index:100; top:100%;"></div>
+            </div>
             <input type="number" placeholder="الكمية" value="1" min="1" class="rent-item-qty" oninput="calculateRentTotal()" style="width: 70px; margin-bottom:0;">
             <button class="btn-danger btn-small" onclick="document.getElementById('row-${rowId}').remove(); calculateRentTotal()">X</button>
         </div>
     `;
     container.insertAdjacentHTML('beforeend', rowHTML);
-    const newSelect = container.querySelector(`#row-${rowId} .rent-item-select`);
-    populateSelectOptions(newSelect);
 }
 
 function calculateRentTotal() {
-    const selects = document.querySelectorAll('.rent-item-select');
+    const prices = document.querySelectorAll('.rent-item-price');
     const qtys = document.querySelectorAll('.rent-item-qty');
     let dailyTotal = 0;
 
-    selects.forEach((select, index) => {
-        if(select.value) {
-            const price = parseFloat(select.options[select.selectedIndex].getAttribute('data-price'));
-            const qty = parseInt(qtys[index].value) || 1;
-            dailyTotal += (price * qty);
-        }
+    prices.forEach((priceInput, index) => {
+        const price = parseFloat(priceInput.value) || 0;
+        const qty = parseInt(qtys[index].value) || 1;
+        dailyTotal += (price * qty);
     });
 
     const days = parseInt(document.getElementById('rent-days').value) || 0;
@@ -407,12 +442,12 @@ function saveRentalTransaction() {
     customer.balance += remaining;
 
     let itemsText = [];
+    const searches = document.querySelectorAll('.rent-item-search');
     const qtys = document.querySelectorAll('.rent-item-qty');
     
-    document.querySelectorAll('.rent-item-select').forEach((select, index) => {
-        if(select.value) {
-            // إظهار العدد الخاص بكل مادة
-            const itemName = select.options[select.selectedIndex].text.split('(')[0].trim();
+    searches.forEach((search, index) => {
+        if(search.value.trim() !== '') {
+            const itemName = search.value.trim();
             const qty = qtys[index].value || 1;
             itemsText.push(`${itemName} (عدد ${qty})`);
         }
@@ -503,29 +538,21 @@ function saveEditTransaction() {
 
 function openReturnModal(id) {
     document.getElementById('return-trans-id').value = id;
-    document.getElementById('return-items-note').value = '';
     document.getElementById('return-paid-now').value = '';
-    document.getElementById('return-status').value = 'completed'; 
     openModal('returnModal');
 }
 
-function saveReturn() {
+function saveReturn(status) {
     const id = parseInt(document.getElementById('return-trans-id').value);
     const trans = data.transactions.find(t => t.id === id);
     const customer = data.customers.find(c => c.id === trans.customerId);
     
-    const note = document.getElementById('return-items-note').value;
     const paidNow = parseFloat(document.getElementById('return-paid-now').value) || 0;
-    const status = document.getElementById('return-status').value;
     
     if (paidNow > 0) {
         trans.paid += paidNow;
         trans.remaining = trans.total - trans.paid;
-        customer.balance -= paidNow; // الدفع الآن يقلل من دين الزبون
-    }
-    
-    if (note.trim() !== "") {
-        trans.items += `<br><span style="color:#e67e22;">إرجاع: ${note}</span>`;
+        customer.balance -= paidNow; 
     }
     
     trans.status = status;
