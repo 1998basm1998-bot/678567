@@ -43,6 +43,9 @@
                     <div class="top-actions">
                         <button onclick="openModal('addCustomerModal')" class="btn-primary">إضافة زبون جديد +</button>
                     </div>
+                    
+                    <input type="text" id="search-customer" placeholder="بحث عن زبون (من أول حرف)..." onkeyup="searchCustomer()" style="border-color: #27ae60;">
+
                     <div id="customers-list" class="list-container">
                         </div>
                 </div>
@@ -122,6 +125,22 @@
         </div>
     </div>
 
+    <div id="editCustomerModal" class="modal">
+        <div class="modal-content">
+            <h3>تعديل الزبون</h3>
+            <input type="hidden" id="edit-cust-id">
+            <input type="text" id="edit-cust-name" placeholder="اسم الزبون">
+            <div class="input-group">
+                <span class="country-code">+964</span>
+                <input type="number" id="edit-cust-phone" placeholder="رقم الهاتف بدون مفتاح الدولة" style="margin-bottom: 0;">
+            </div>
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button onclick="saveEditCustomer()" class="btn-primary">حفظ التعديلات</button>
+                <button onclick="closeModal('editCustomerModal')" class="btn-secondary">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
     <div id="rentModal" class="modal">
         <div class="modal-content modal-large">
             <h3>تأجير جديد</h3>
@@ -158,6 +177,47 @@
             <div class="modal-actions">
                 <button onclick="savePayment()" class="btn-primary">حفظ</button>
                 <button onclick="closeModal('paymentModal')" class="btn-secondary">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editTransactionModal" class="modal">
+        <div class="modal-content">
+            <h3>تعديل المعاملة</h3>
+            <input type="hidden" id="edit-trans-id">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">عدد الأيام</label>
+            <input type="number" id="edit-trans-days">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">المبلغ الكلي</label>
+            <input type="number" id="edit-trans-total">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">المدفوع من الفاتورة</label>
+            <input type="number" id="edit-trans-paid">
+            <div class="modal-actions">
+                <button onclick="saveEditTransaction()" class="btn-primary">حفظ التعديلات</button>
+                <button onclick="closeModal('editTransactionModal')" class="btn-secondary">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="returnModal" class="modal">
+        <div class="modal-content">
+            <h3>إرجاع مواد وتسوية</h3>
+            <input type="hidden" id="return-trans-id">
+            
+            <label style="display:block; margin-bottom:5px; font-weight:bold; color:#e67e22;">ما هي المواد التي أرجعها؟ (اختياري)</label>
+            <input type="text" id="return-items-note" placeholder="مثال: تم إرجاع 2 دريل">
+            
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">هل دفع مبلغاً الآن؟ (إن وجد)</label>
+            <input type="number" id="return-paid-now" placeholder="المبلغ المدفوع الآن">
+
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">حالة المعاملة بعد الإرجاع</label>
+            <select id="return-status">
+                <option value="ongoing">مستمرة (بقي لديه مواد أخرى ولم يرجعها كلها)</option>
+                <option value="completed">مكتملة (أرجع كل المواد سواء حاسب عليها أو بقت كدين)</option>
+            </select>
+
+            <div class="modal-actions">
+                <button onclick="saveReturn()" class="btn-success">حفظ الإرجاع</button>
+                <button onclick="closeModal('returnModal')" class="btn-secondary">إلغاء</button>
             </div>
         </div>
     </div>
