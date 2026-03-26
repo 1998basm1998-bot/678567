@@ -24,7 +24,7 @@ function checkPassword() {
     if (pass === "1001") {
         document.getElementById('login-screen').classList.remove('active');
         document.getElementById('main-app').classList.add('active');
-        renderInventory();
+        switchTab('tab-customers'); 
     } else {
         alert("كلمة المرور خاطئة");
     }
@@ -280,6 +280,9 @@ function openCustomerDetails(id) {
     document.getElementById('customer-details-view').style.display = 'block';
     
     document.getElementById('detail-customer-name').innerText = customer.name;
+    document.getElementById('detail-customer-phone').innerText = "+" + customer.phone;
+    document.getElementById('detail-customer-phone').href = "tel:+" + customer.phone;
+
     updateCustomerBalanceDisplay(customer);
     renderTransactions();
 }
@@ -438,37 +441,85 @@ function saveRentalTransaction() {
     }
 
     const customer = data.customers.find(c => c.id === currentCustomerId);
-    const remaining = grandTotal - paid;
-    customer.balance += remaining;
 
     let itemsText = [];
+    let itemsArray = [];
+    let canRent = true;
+
     const searches = document.querySelectorAll('.rent-item-search');
     const qtys = document.querySelectorAll('.rent-item-qty');
     
     searches.forEach((search, index) => {
         if(search.value.trim() !== '') {
             const itemName = search.value.trim();
-            const qty = qtys[index].value || 1;
-            itemsText.push(`${itemName} (عدد ${qty})`);
+            const qty = parseInt(qtys[index].value) || 1;
+            
+            let foundItem = data.inventory1.find(i => i.name === itemName);
+            let invType = 1;
+            if(!foundItem) {
+                foundItem = data.inventory2.find(i => i.name === itemName);
+                invType = 2;
+            }
+
+            if(foundItem) {
+                if(foundItem.qty < qty) {
+                    canRent = false;
+                } else {
+                    itemsArray.push({
+                        id: foundItem.id,
+                        name: foundItem.name,
+                        qty: qty,
+                        invType: invType,
+                        returnedQty: 0,
+                        returnDate: null
+                    });
+                    itemsText.push(`${itemName} (عدد ${qty})`);
+                }
+            } else {
+                 canRent = false;
+            }
         }
     });
+
+    if(!canRent) {
+        alert("المخزون لا يكفي أو المادة غير موجودة!");
+        return;
+    }
+
+    itemsArray.forEach(item => {
+        if(item.invType === 1) {
+            let invItem = data.inventory1.find(i => i.id === item.id);
+            if(invItem) invItem.qty -= item.qty;
+        } else {
+            let invItem = data.inventory2.find(i => i.id === item.id);
+            if(invItem) invItem.qty -= item.qty;
+        }
+    });
+
+    const remaining = grandTotal - paid;
+    customer.balance += remaining;
 
     const returnDate = new Date();
     returnDate.setDate(returnDate.getDate() + days);
     
     const now = new Date();
+    const rawDate = now.toISOString().split('T')[0];
+    const rawTime = now.toTimeString().slice(0, 5);
 
     const transaction = {
         id: Date.now(),
         customerId: currentCustomerId,
         type: 'rent',
         items: itemsText.join(' + '),
+        itemsArray: itemsArray,
         days: days,
         total: grandTotal,
         paid: paid,
         remaining: remaining,
         date: now.toLocaleDateString('ar-IQ'),
         time: now.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        rawDate: rawDate,
+        rawTime: rawTime,
         returnDateTimestamp: returnDate.getTime(),
         status: 'ongoing'
     };
@@ -478,6 +529,7 @@ function saveRentalTransaction() {
     closeModal('rentModal');
     updateCustomerBalanceDisplay(customer);
     renderTransactions();
+    renderInventory();
 }
 
 function deleteTransaction(id) {
@@ -486,15 +538,30 @@ function deleteTransaction(id) {
         const customer = data.customers.find(c => c.id === trans.customerId);
         
         if (trans.type === 'rent') {
-            customer.balance -= trans.remaining; // خصم الدين الذي تم إضافته
+            customer.balance -= trans.remaining;
+            if(trans.itemsArray) {
+                trans.itemsArray.forEach(item => {
+                    const unreturnedQty = item.qty - item.returnedQty;
+                    if(unreturnedQty > 0) {
+                        if(item.invType === 1) {
+                            let invItem = data.inventory1.find(i => i.id === item.id);
+                            if(invItem) invItem.qty += unreturnedQty;
+                        } else {
+                            let invItem = data.inventory2.find(i => i.id === item.id);
+                            if(invItem) invItem.qty += unreturnedQty;
+                        }
+                    }
+                });
+            }
         } else if (trans.type === 'payment') {
-            customer.balance += trans.amount; // إضافة المبلغ الذي تم تنزيله
+            customer.balance += trans.amount; 
         }
         
         data.transactions = data.transactions.filter(t => t.id !== id);
         saveData();
         updateCustomerBalanceDisplay(customer);
         renderTransactions();
+        renderInventory();
     }
 }
 
@@ -502,6 +569,9 @@ function openEditTransactionModal(id) {
     const trans = data.transactions.find(t => t.id === id);
     if(trans && trans.type === 'rent') {
         document.getElementById('edit-trans-id').value = id;
+        document.getElementById('edit-trans-items').value = trans.items || '';
+        document.getElementById('edit-trans-date').value = trans.rawDate || '';
+        document.getElementById('edit-trans-time').value = trans.rawTime || '';
         document.getElementById('edit-trans-days').value = trans.days;
         document.getElementById('edit-trans-total').value = trans.total;
         document.getElementById('edit-trans-paid').value = trans.paid;
@@ -514,20 +584,23 @@ function saveEditTransaction() {
     const trans = data.transactions.find(t => t.id === id);
     const customer = data.customers.find(c => c.id === trans.customerId);
     
+    const newItems = document.getElementById('edit-trans-items').value;
+    const newDate = document.getElementById('edit-trans-date').value;
+    const newTime = document.getElementById('edit-trans-time').value;
     const newDays = parseInt(document.getElementById('edit-trans-days').value) || trans.days;
     const newTotal = parseFloat(document.getElementById('edit-trans-total').value) || 0;
     const newPaid = parseFloat(document.getElementById('edit-trans-paid').value) || 0;
     
-    // التراجع عن التأثير القديم
     customer.balance -= trans.remaining;
     
-    // التحديث
+    trans.items = newItems;
+    if(newDate) { trans.rawDate = newDate; trans.date = newDate; }
+    if(newTime) { trans.rawTime = newTime; trans.time = newTime; }
     trans.days = newDays;
     trans.total = newTotal;
     trans.paid = newPaid;
     trans.remaining = trans.total - trans.paid;
     
-    // تطبيق التأثير الجديد
     customer.balance += trans.remaining;
     
     saveData();
@@ -538,29 +611,79 @@ function saveEditTransaction() {
 
 function openReturnModal(id) {
     document.getElementById('return-trans-id').value = id;
-    document.getElementById('return-paid-now').value = '';
+    const trans = data.transactions.find(t => t.id === id);
+    const container = document.getElementById('return-items-container');
+    container.innerHTML = '';
+
+    if(trans.itemsArray && trans.itemsArray.length > 0) {
+        trans.itemsArray.forEach((item, index) => {
+            const pendingQty = item.qty - item.returnedQty;
+            let html = `
+                <div class="rent-item-row" style="flex-direction:column; align-items:start; gap:5px;">
+                    <div style="font-weight:bold;">${item.name} (الكمية الكلية: ${item.qty} | المتبقي للإرجاع: ${pendingQty})</div>
+            `;
+            
+            if(pendingQty > 0) {
+                html += `
+                    <div style="display:flex; gap:5px; width:100%;">
+                        <input type="number" id="ret-qty-${index}" placeholder="الكمية المرجعة" value="${pendingQty}" max="${pendingQty}" min="1" style="margin-bottom:0; flex:1;">
+                        <input type="number" id="ret-pay-${index}" placeholder="مبلغ التسديد" style="margin-bottom:0; flex:1;">
+                        <button class="btn-primary btn-small" onclick="processSingleReturn(${id}, ${index})" style="margin-bottom:0;">إرجاع</button>
+                    </div>
+                `;
+            } else {
+                html += `<div style="color:green; font-size:14px; font-weight:bold;">تم الإرجاع بتاريخ: ${item.returnDate}</div>`;
+            }
+            html += `</div>`;
+            container.innerHTML += html;
+        });
+    } else {
+        container.innerHTML = '<p>لا توجد تفاصيل مواد لهذه المعاملة القديمة.</p>';
+    }
     openModal('returnModal');
 }
 
-function saveReturn(status) {
-    const id = parseInt(document.getElementById('return-trans-id').value);
-    const trans = data.transactions.find(t => t.id === id);
+function processSingleReturn(transId, itemIndex) {
+    const trans = data.transactions.find(t => t.id === transId);
     const customer = data.customers.find(c => c.id === trans.customerId);
+    const item = trans.itemsArray[itemIndex];
     
-    const paidNow = parseFloat(document.getElementById('return-paid-now').value) || 0;
+    const qtyInput = parseInt(document.getElementById(`ret-qty-${itemIndex}`).value) || 0;
+    const payInput = parseFloat(document.getElementById(`ret-pay-${itemIndex}`).value) || 0;
     
-    if (paidNow > 0) {
-        trans.paid += paidNow;
-        trans.remaining = trans.total - trans.paid;
-        customer.balance -= paidNow; 
+    const pendingQty = item.qty - item.returnedQty;
+    if(qtyInput <= 0 || qtyInput > pendingQty) {
+        alert("كمية الإرجاع غير صالحة"); return;
     }
-    
-    trans.status = status;
-    
+
+    item.returnedQty += qtyInput;
+    const now = new Date();
+    item.returnDate = now.toLocaleDateString('ar-IQ') + ' ' + now.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    if(item.invType === 1) {
+        let invItem = data.inventory1.find(i => i.id === item.id);
+        if(invItem) invItem.qty += qtyInput;
+    } else {
+        let invItem = data.inventory2.find(i => i.id === item.id);
+        if(invItem) invItem.qty += qtyInput;
+    }
+
+    if(payInput > 0) {
+        trans.paid += payInput;
+        trans.remaining = trans.total - trans.paid;
+        customer.balance -= payInput;
+    }
+
+    const allReturned = trans.itemsArray.every(i => i.returnedQty >= i.qty);
+    if(allReturned) {
+        trans.status = 'completed';
+    }
+
     saveData();
-    closeModal('returnModal');
+    openReturnModal(transId); 
     updateCustomerBalanceDisplay(customer);
     renderTransactions();
+    renderInventory();
 }
 
 function renderTransactions() {
@@ -570,7 +693,7 @@ function renderTransactions() {
     const custTrans = data.transactions.filter(t => t.customerId === currentCustomerId).reverse();
 
     custTrans.forEach(t => {
-        const displayTime = t.time ? t.time : ''; // إذا لم يكن موجوداً قديماً
+        const displayTime = t.time ? t.time : ''; 
         
         if(t.type === 'payment') {
             list.innerHTML += `
@@ -609,7 +732,6 @@ function shareWhatsApp(transId) {
     const trans = data.transactions.find(t => t.id === transId);
     const customer = data.customers.find(c => c.id === trans.customerId);
     
-    // إزالة الـ HTML tags لو وجدت من الملاحظات
     const cleanItems = trans.items.replace(/<[^>]*>?/gm, ' ');
 
     const message = `*محلات كريم لتأجير العدد اليدوية*\n\nمرحباً ${customer.name}،\nتفاصيل التأجير:\nالمواد: ${cleanItems}\nالمدة: ${trans.days} أيام\nالمبلغ الكلي: ${formatIQD(trans.total)} د.ع\nالمدفوع: ${formatIQD(trans.paid)} د.ع\nالمتبقي من هذه الفاتورة: ${formatIQD(trans.remaining)} د.ع\n\nإجمالي الباقي بذمتكم: ${formatIQD(customer.balance)} د.ع\n\nشكراً لتعاملكم معنا!`;
