@@ -214,7 +214,7 @@ function openEditCustomerModal(id) {
     if (customer) {
         document.getElementById('edit-cust-id').value = customer.id;
         document.getElementById('edit-cust-name').value = customer.name;
-        document.getElementById('edit-cust-phone').value = customer.phone.replace(/^964/, ''); // إزالة الكود للعرض
+        document.getElementById('edit-cust-phone').value = customer.phone.replace(/^964/, ''); 
         
         openModal('editCustomerModal');
     }
@@ -244,7 +244,6 @@ function renderCustomers(searchQuery = '') {
     
     let filteredCustomers = data.customers;
     if(searchQuery) {
-        // فلترة من أول حرف للاسم
         filteredCustomers = filteredCustomers.filter(cust => cust.name.toLowerCase().startsWith(searchQuery));
     }
 
@@ -521,7 +520,8 @@ function saveRentalTransaction() {
         rawDate: rawDate,
         rawTime: rawTime,
         returnDateTimestamp: returnDate.getTime(),
-        status: 'ongoing'
+        status: 'ongoing',
+        returnHistory: []
     };
 
     data.transactions.push(transaction);
@@ -632,25 +632,34 @@ function openReturnModal(id) {
             let html = `
                 <div class="rent-item-row" style="flex-direction:column; align-items:start; gap:5px;">
                     <div style="font-weight:bold;">${item.name} (الكمية الكلية: ${item.qty} | المتبقي للإرجاع: ${pendingQty})</div>
-            `;
-            
-            if(pendingQty > 0) {
-                html += `
                     <div style="display:flex; gap:5px; width:100%;">
-                        <input type="number" id="ret-qty-${index}" placeholder="الكمية المرجعة" value="${pendingQty}" max="${pendingQty}" min="1" style="margin-bottom:0; flex:1;">
+                        <input type="number" id="ret-qty-${index}" placeholder="الكمية المرجعة" value="${pendingQty > 0 ? pendingQty : 0}" min="0" style="margin-bottom:0; flex:1;">
                         <input type="number" id="ret-pay-${index}" placeholder="مبلغ التسديد" style="margin-bottom:0; flex:1;">
                         <button class="btn-primary btn-small" onclick="processSingleReturn(${id}, ${index})" style="margin-bottom:0;">إرجاع</button>
                     </div>
-                `;
-            } else {
-                html += `<div style="color:green; font-size:14px; font-weight:bold;">تم الإرجاع بتاريخ: ${item.returnDate}</div>`;
-            }
-            html += `</div>`;
+                </div>
+            `;
             container.innerHTML += html;
         });
     } else {
         container.innerHTML = '<p>لا توجد تفاصيل مواد لهذه المعاملة القديمة.</p>';
     }
+
+    const historyContainer = document.getElementById('return-history-container');
+    historyContainer.innerHTML = '';
+    
+    if(trans.returnHistory && trans.returnHistory.length > 0) {
+        trans.returnHistory.forEach(h => {
+            historyContainer.innerHTML += `
+                <div style="background: #f8f9fa; padding: 8px; margin-bottom: 5px; border-radius: 5px; border: 1px solid #e1e8ed; font-size: 13px;">
+                    <strong>${h.itemName}</strong> | تم إرجاع: ${h.qty} | تسديد: ${formatIQD(h.paid)} د.ع | التاريخ: ${h.date}
+                </div>
+            `;
+        });
+    } else {
+        historyContainer.innerHTML = '<p style="font-size: 13px; color: #7f8c8d;">لا توجد إرجاعات سابقة.</p>';
+    }
+
     openModal('returnModal');
 }
 
@@ -662,21 +671,27 @@ function processSingleReturn(transId, itemIndex) {
     const qtyInput = parseInt(document.getElementById(`ret-qty-${itemIndex}`).value) || 0;
     const payInput = parseFloat(document.getElementById(`ret-pay-${itemIndex}`).value) || 0;
     
-    const pendingQty = item.qty - item.returnedQty;
-    if(qtyInput <= 0 || qtyInput > pendingQty) {
-        alert("كمية الإرجاع غير صالحة"); return;
+    if(qtyInput < 0 || payInput < 0) {
+        alert("القيم غير صالحة"); return;
+    }
+    
+    if(qtyInput === 0 && payInput === 0) {
+        alert("يرجى إدخال كمية أو مبلغ للتسديد"); return;
     }
 
     item.returnedQty += qtyInput;
     const now = new Date();
-    item.returnDate = now.toLocaleDateString('ar-IQ') + ' ' + now.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const dateStr = now.toLocaleDateString('ar-IQ') + ' ' + now.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit', hour12: true });
+    item.returnDate = dateStr;
 
-    if(item.invType === 1) {
-        let invItem = data.inventory1.find(i => i.id === item.id);
-        if(invItem) invItem.qty += qtyInput;
-    } else {
-        let invItem = data.inventory2.find(i => i.id === item.id);
-        if(invItem) invItem.qty += qtyInput;
+    if(qtyInput > 0) {
+        if(item.invType === 1) {
+            let invItem = data.inventory1.find(i => i.id === item.id);
+            if(invItem) invItem.qty += qtyInput;
+        } else {
+            let invItem = data.inventory2.find(i => i.id === item.id);
+            if(invItem) invItem.qty += qtyInput;
+        }
     }
 
     if(payInput > 0) {
@@ -685,9 +700,19 @@ function processSingleReturn(transId, itemIndex) {
         customer.balance -= payInput;
     }
 
+    if(!trans.returnHistory) trans.returnHistory = [];
+    trans.returnHistory.push({
+        itemName: item.name,
+        qty: qtyInput,
+        paid: payInput,
+        date: dateStr
+    });
+
     const allReturned = trans.itemsArray.every(i => i.returnedQty >= i.qty);
     if(allReturned) {
         trans.status = 'completed';
+    } else {
+        trans.status = 'ongoing';
     }
 
     saveData();
