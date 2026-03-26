@@ -573,10 +573,21 @@ function openEditTransactionModal(id) {
         document.getElementById('edit-trans-date').value = trans.rawDate || '';
         document.getElementById('edit-trans-time').value = trans.rawTime || '';
         document.getElementById('edit-trans-days').value = trans.days;
+        
+        const dailyRate = trans.days > 0 ? (trans.total / trans.days) : 0;
+        document.getElementById('edit-trans-days').dataset.dailyRate = dailyRate;
+        
         document.getElementById('edit-trans-total').value = trans.total;
         document.getElementById('edit-trans-paid').value = trans.paid;
         openModal('editTransactionModal');
     }
+}
+
+function updateEditTotal() {
+    const daysInput = document.getElementById('edit-trans-days');
+    const dailyRate = parseFloat(daysInput.dataset.dailyRate) || 0;
+    const newDays = parseInt(daysInput.value) || 0;
+    document.getElementById('edit-trans-total').value = dailyRate * newDays;
 }
 
 function saveEditTransaction() {
@@ -718,7 +729,8 @@ function renderTransactions() {
                     </div>
                     <div class="card-actions">
                         <button class="btn-success btn-small" onclick="shareWhatsApp(${t.id})" style="margin-bottom:3px;">واتساب</button>
-                        ${t.status === 'ongoing' ? `<button class="btn-primary btn-small" onclick="openReturnModal(${t.id})" style="margin-bottom:3px; background:linear-gradient(to bottom, #e67e22, #d35400);">الراجع</button>` : `<span style="color: #27ae60; font-size:14px; font-weight:bold; text-align:center; margin-bottom:5px;">مكتملة ✔</span>`}
+                        <button class="btn-primary btn-small" onclick="openReturnModal(${t.id})" style="margin-bottom:3px; background:linear-gradient(to bottom, #e67e22, #d35400);">الراجع</button>
+                        ${t.status === 'completed' ? `<span style="color: #27ae60; font-size:14px; font-weight:bold; text-align:center; margin-bottom:5px;">مكتملة ✔</span>` : ''}
                         <button class="btn-warning btn-small" onclick="openEditTransactionModal(${t.id})" style="margin-bottom:3px;">تعديل</button>
                         <button class="btn-danger btn-small" onclick="deleteTransaction(${t.id})">حذف</button>
                     </div>
