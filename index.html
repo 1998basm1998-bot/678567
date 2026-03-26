@@ -23,22 +23,7 @@
 
         <main id="app-content">
             
-            <section id="tab-inventory" class="tab-content active">
-                <div class="top-actions">
-                    <button onclick="openModal('addItemModal')" class="btn-primary">إضافة مادة +</button>
-                </div>
-                
-                <input type="text" id="search-inventory" placeholder="بحث عن مادة (اكتب بداية اسم المادة)..." onkeyup="searchInventory()">
-
-                <div class="inventory-selectors">
-                    <button onclick="switchInventory(1)" id="btn-inv-1" class="active">المخزون 1</button>
-                    <button onclick="switchInventory(2)" id="btn-inv-2">المخزون 2</button>
-                </div>
-                <div id="inventory-list" class="list-container">
-                    </div>
-            </section>
-
-            <section id="tab-customers" class="tab-content">
+            <section id="tab-customers" class="tab-content active">
                 <div id="customers-main-view">
                     <div class="top-actions">
                         <button onclick="openModal('addCustomerModal')" class="btn-primary">إضافة زبون جديد +</button>
@@ -53,6 +38,7 @@
                 <div id="customer-details-view" style="display: none;">
                     <button onclick="backToCustomers()" class="btn-secondary">رجوع</button>
                     <h2 id="detail-customer-name" style="margin-top: 10px;">اسم الزبون</h2>
+                    <a id="detail-customer-phone" href="" style="display:block; text-align:center; margin-bottom: 15px; color: #2980b9; text-decoration: none; font-weight: bold; direction: ltr;"></a>
                     <div class="balance-card">
                         <p>الباقي الكلي:</p>
                         <h3 id="detail-customer-balance">0 دينار عراقي</h3>
@@ -67,6 +53,21 @@
                 </div>
             </section>
 
+            <section id="tab-inventory" class="tab-content">
+                <div class="top-actions">
+                    <button onclick="openModal('addItemModal')" class="btn-primary">إضافة مادة +</button>
+                </div>
+                
+                <input type="text" id="search-inventory" placeholder="بحث عن مادة (اكتب بداية اسم المادة)..." onkeyup="searchInventory()">
+
+                <div class="inventory-selectors">
+                    <button onclick="switchInventory(1)" id="btn-inv-1" class="active">المخزون 1</button>
+                    <button onclick="switchInventory(2)" id="btn-inv-2">المخزون 2</button>
+                </div>
+                <div id="inventory-list" class="list-container">
+                    </div>
+            </section>
+
             <section id="tab-alerts" class="tab-content">
                 <h2 style="margin-bottom: 15px;">التنبيهات (متجاوزي المدة)</h2>
                 <div id="alerts-list" class="list-container">
@@ -76,8 +77,8 @@
         </main>
 
         <nav class="bottom-nav">
-            <button onclick="switchTab('tab-inventory')" class="nav-btn active" id="nav-inventory">المخزون</button>
-            <button onclick="switchTab('tab-customers')" class="nav-btn" id="nav-customers">الزبائن</button>
+            <button onclick="switchTab('tab-customers')" class="nav-btn active" id="nav-customers">الزبائن</button>
+            <button onclick="switchTab('tab-inventory')" class="nav-btn" id="nav-inventory">المخزون</button>
             <button onclick="switchTab('tab-alerts')" class="nav-btn" id="nav-alerts">التنبيهات</button>
         </nav>
     </div>
@@ -185,12 +186,25 @@
         <div class="modal-content">
             <h3>تعديل المعاملة</h3>
             <input type="hidden" id="edit-trans-id">
-            <label style="display:block; margin-bottom:5px; font-weight:bold;">عدد الأيام</label>
+            
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">المواد (نص):</label>
+            <input type="text" id="edit-trans-items">
+            
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">التاريخ:</label>
+            <input type="date" id="edit-trans-date">
+            
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">الوقت:</label>
+            <input type="time" id="edit-trans-time">
+            
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">عدد الأيام:</label>
             <input type="number" id="edit-trans-days">
-            <label style="display:block; margin-bottom:5px; font-weight:bold;">المبلغ الكلي</label>
+            
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">المبلغ الكلي:</label>
             <input type="number" id="edit-trans-total">
-            <label style="display:block; margin-bottom:5px; font-weight:bold;">المدفوع من الفاتورة</label>
+            
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">المدفوع من الفاتورة:</label>
             <input type="number" id="edit-trans-paid">
+            
             <div class="modal-actions">
                 <button onclick="saveEditTransaction()" class="btn-primary">حفظ التعديلات</button>
                 <button onclick="closeModal('editTransactionModal')" class="btn-secondary">إلغاء</button>
@@ -199,17 +213,12 @@
     </div>
 
     <div id="returnModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content modal-large">
             <h3>تسوية وإرجاع</h3>
             <input type="hidden" id="return-trans-id">
-            
-            <label style="display:block; margin-bottom:10px; font-weight:bold;">هل دفع مبلغاً الآن؟ (اتركه فارغاً إذا لم يدفع)</label>
-            <input type="number" id="return-paid-now" placeholder="المبلغ المدفوع الآن">
-
-            <div class="modal-actions" style="flex-direction: column; gap: 10px;">
-                <button onclick="saveReturn('completed')" class="btn-success">استلام المواد وإنهاء المعاملة</button>
-                <button onclick="saveReturn('ongoing')" class="btn-primary">استلام جزء من المواد فقط</button>
-                <button onclick="closeModal('returnModal')" class="btn-secondary">إلغاء</button>
+            <div id="return-items-container"></div>
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button onclick="closeModal('returnModal')" class="btn-secondary">إغلاق</button>
             </div>
         </div>
     </div>
