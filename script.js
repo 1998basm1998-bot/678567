@@ -1,23 +1,7 @@
 // script.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-const firebaseConfig = {
-    apiKey: "AIzaSyClhb_-h8A25NcRkt7q-Jm15HkIQX2NoEs",
-    authDomain: "kiui-3527b.firebaseapp.com",
-    projectId: "kiui-3527b",
-    storageBucket: "kiui-3527b.firebasestorage.app",
-    messagingSenderId: "174501891120",
-    appId: "1:174501891120:web:aa6a83eb7c776f88aa71f5"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
 let currentInventory = 1;
 let currentRentInventory = 1; 
 let currentCustomerId = null;
-let isOnline = navigator.onLine;
 
 let data = {
     inventory1: [],
@@ -27,9 +11,6 @@ let data = {
     lastSync: 0
 };
 
-let syncQueue = [];
-
-// IndexedDB Wrapper
 const DB_NAME = 'kareemDB';
 const DB_VERSION = 1;
 
@@ -71,107 +52,13 @@ async function setLocalData(key, value) {
 
 async function initData() {
     const localData = await getLocalData('kareemData');
-    const localQueue = await getLocalData('syncQueue');
     if (localData) data = localData;
-    if (localQueue) syncQueue = localQueue;
-    
-    if (isOnline) {
-        await syncData();
-    } else {
-        updateUI();
-    }
+    updateUI();
 }
 
 async function saveDataLocally() {
     await setLocalData('kareemData', data);
-    if (isOnline) {
-        addToQueue('sync');
-        processQueue();
-    } else {
-        addToQueue('sync');
-    }
 }
-
-function addToQueue(action) {
-    syncQueue.push({ action, timestamp: Date.now() });
-    setLocalData('syncQueue', syncQueue);
-}
-
-async function syncData() {
-    updateNetworkStatus('syncing');
-    try {
-        const docRef = doc(db, "data", "main");
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-            const serverData = docSnap.data();
-            mergeData(serverData);
-        }
-        
-        await setDoc(docRef, data);
-        syncQueue = [];
-        await setLocalData('syncQueue', syncQueue);
-        updateNetworkStatus('online');
-        updateUI();
-    } catch (e) {
-        updateNetworkStatus('offline');
-    }
-}
-
-function mergeData(serverData) {
-    const mergeArray = (localArr, serverArr) => {
-        const map = new Map();
-        serverArr.forEach(item => map.set(item.id, item));
-        localArr.forEach(item => {
-            if (!map.has(item.id) || (item.lastUpdated && item.lastUpdated > map.get(item.id).lastUpdated)) {
-                map.set(item.id, item);
-            }
-        });
-        return Array.from(map.values());
-    };
-
-    data.inventory1 = mergeArray(data.inventory1 || [], serverData.inventory1 || []);
-    data.inventory2 = mergeArray(data.inventory2 || [], serverData.inventory2 || []);
-    data.customers = mergeArray(data.customers || [], serverData.customers || []);
-    data.transactions = mergeArray(data.transactions || [], serverData.transactions || []);
-    data.lastSync = Date.now();
-    setLocalData('kareemData', data);
-}
-
-async function processQueue() {
-    if (!isOnline || syncQueue.length === 0) return;
-    await syncData();
-}
-
-function updateNetworkStatus(status) {
-    const el = document.getElementById('network-status');
-    el.className = `network-status ${status}`;
-    if (status === 'online') el.innerText = 'متصل';
-    if (status === 'offline') el.innerText = 'غير متصل';
-    if (status === 'syncing') el.innerText = 'جاري المزامنة...';
-}
-
-window.addEventListener('online', () => { isOnline = true; processQueue(); });
-window.addEventListener('offline', () => { isOnline = false; updateNetworkStatus('offline'); });
-
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
-}
-
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    document.getElementById('install-prompt').style.display = 'block';
-});
-document.getElementById('btn-install').addEventListener('click', () => {
-    document.getElementById('install-prompt').style.display = 'none';
-    deferredPrompt.prompt();
-    deferredPrompt = null;
-});
-document.getElementById('btn-close-install').addEventListener('click', () => {
-    document.getElementById('install-prompt').style.display = 'none';
-});
 
 function formatIQD(number) { return new Intl.NumberFormat('en-IQ').format(number); }
 
